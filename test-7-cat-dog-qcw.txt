@@ -1,7 +1,0 @@
-S
-5
-cat
-cab
-cob
-dob
-dog

@@ -1,6 +1,7 @@
 // Project Identifier: 50EB44D3F029ED934858FFFCEAC3547C68251FC9
 
 #include "letter.h"
+#include <unordered_map>
 using namespace std;
 
 int main (int argc, char* argv[]) {
@@ -31,7 +32,13 @@ int main (int argc, char* argv[]) {
     }
 
     vector<WordInfo> dictionary;
-    dictionary.reserve((size_t)max(0LL, declared_n * 2));
+    if (dictType == 'C') {
+        dictionary.reserve(static_cast<size_t>(max(0LL, declared_n) * 2.5));
+    }
+    else {
+        dictionary.reserve(static_cast<size_t>(max(0LL, declared_n)));
+    }
+
     long long read_count = 0;
     while(read_count < declared_n && getline(cin, line)) {
         if (line.empty()) {
@@ -91,7 +98,8 @@ int main (int argc, char* argv[]) {
     dictionary[beginIndex].parent = SIZE_MAX;
     sc.push_back(beginIndex);
 
-    size_t discovered_count = 0;
+    size_t discovered_count = 1;
+    bool solution_found = false;
 
     while (!sc.empty()) {
         size_t current;
@@ -104,16 +112,17 @@ int main (int argc, char* argv[]) {
             sc.pop_front();
         }
 
-        ++discovered_count;
-
         if (current == endIndex) {
+            solution_found = true;
             break;
         }
 
         const string &curWord = dictionary[current].word;
         size_t curLen = curWord.size();
         
-        vector<size_t> candidateLengths = {curLen};
+        vector<size_t> candidateLengths;
+        candidateLengths.reserve(3);
+        candidateLengths.push_back(curLen);
         if (opts.allowLength) {
             candidateLengths.push_back(curLen + 1);
             if (curLen > 0) {
@@ -136,19 +145,20 @@ int main (int argc, char* argv[]) {
                 const string &candidate = dictionary[i].word;
                 
                 bool similar = false;
-                if (opts.allowChange && oneLetterChange(curWord, candidate)) {
+                if (opts.allowSwap && swapAdjacent(curWord, candidate)) {
+                    similar = true;
+                }
+                if (!similar && opts.allowChange && oneLetterChange(curWord, candidate)) {
                     similar = true;
                 }
                 if (!similar && opts.allowLength && insertOrDelete(curWord, candidate)) {
-                    similar = true;
-                }
-                if (!similar && opts.allowSwap && swapAdjacent(curWord, candidate)) {
                     similar = true;
                 }
 
                 if (similar) {
                     dictionary[i].discovered = true;
                     dictionary[i].parent = current;
+                    ++discovered_count;
 
                     if (opts.search_mode == SearchMode::QUEUE) {
                         sc.push_back(i);
@@ -166,7 +176,7 @@ int main (int argc, char* argv[]) {
         }
     }
 
-    if (!dictionary[endIndex].discovered) {
+    if (!solution_found) {
         cout << "No solution, " << discovered_count << " words discovered.\n";
         return 0;
     }

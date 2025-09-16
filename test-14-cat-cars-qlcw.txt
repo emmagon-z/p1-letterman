@@ -1,7 +1,0 @@
-S
-5
-cat
-car
-cars
-cot
-dog

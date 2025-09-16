@@ -135,20 +135,24 @@ vector<string> expand_complex_line(const string &line) {
     size_t excl = line.find('!');
     size_t q_mark = line.find('?');
 
-    if (amp != string::npos && (amp < l_bracket || l_bracket == string::npos) &&
-        (amp < excl || excl == string::npos) && (amp < q_mark || q_mark == string::npos)) {
-        string base = line.substr(0, line.size() - 1);
+    size_t first_special = string::npos;
+    if (amp != string::npos) first_special = min(first_special, amp);
+    if (l_bracket != string::npos) first_special = min(first_special, l_bracket);
+    if (excl != string::npos) first_special = min(first_special, excl);
+    if (q_mark != string::npos) first_special = min(first_special, q_mark);
+
+    if (first_special == amp) {
+        string base = line.substr(0, amp);
         string rev = base;
         reverse(rev.begin(), rev.end());
 
         auto expanded_base = expand_complex_line(base);
         final_results.insert(final_results.end(), expanded_base.begin(), expanded_base.end());
-
+        
         auto expanded_rev = expand_complex_line(rev);
         final_results.insert(final_results.end(), expanded_rev.begin(), expanded_rev.end());
     }
-    else if (l_bracket != string::npos && (l_bracket < excl || excl == string::npos) &&
-             (l_bracket < q_mark || q_mark == string::npos)) {
+    else if (first_special == l_bracket) {
         size_t r_bracket = line.find(']', l_bracket);
         string before = line.substr(0, l_bracket);
         string choices = line.substr(l_bracket + 1, r_bracket - l_bracket - 1);
@@ -159,39 +163,32 @@ vector<string> expand_complex_line(const string &line) {
             final_results.insert(final_results.end(), recursive_results.begin(), recursive_results.end());
         }
     }
-    else if (excl != string::npos && (excl < q_mark || q_mark == string::npos)) {
-        string prefix = line.substr(0, excl);
-        string suffix = line.substr(excl + 1);
-        if (prefix.length() >= 2) {
-            string swapped = prefix;
-            swap(swapped[swapped.length() - 1], swapped[swapped.length() - 2]);
-            
-            auto expanded_swapped = expand_complex_line(swapped + suffix);
-            final_results.insert(final_results.end(), expanded_swapped.begin(), expanded_swapped.end());
+    else if (first_special == excl) {
+        string before = line.substr(0, excl);
+        string after = line.substr(excl + 1);
 
-            auto expanded_prefix = expand_complex_line(prefix + suffix);
-            final_results.insert(final_results.end(), expanded_prefix.begin(), expanded_prefix.end());
-        }
-        else {
-            auto expanded_prefix = expand_complex_line(prefix + suffix);
-            final_results.insert(final_results.end(), expanded_prefix.begin(), expanded_prefix.end());
+        auto expanded_before = expand_complex_line(before + after);
+        final_results.insert(final_results.end(), expanded_before.begin(), expanded_before.end());
+
+        if (before.length() >= 2) {
+            string swapped = before;
+            swap(swapped[swapped.length() - 1], swapped[swapped.length() - 2]);
+
+            auto expanded_swapped = expand_complex_line(swapped + after);
+            final_results.insert(final_results.end(), expanded_swapped.begin(), expanded_swapped.end());
         }
     }
-    else if (q_mark != string::npos) {
-        string prefix = line.substr(0, q_mark);
-        string suffix = line.substr(q_mark + 1);
-        if (!prefix.empty()) {
-            string doubled = prefix + prefix.back();
+    else if (first_special == q_mark) {
+        string before = line.substr(0, q_mark);
+        string after = line.substr(q_mark + 1);
 
-            auto expanded_normal = expand_complex_line(prefix + suffix);
-            final_results.insert(final_results.end(), expanded_normal.begin(), expanded_normal.end());
+        auto expanded_normal = expand_complex_line(before + after);
+        final_results.insert(final_results.end(), expanded_normal.begin(), expanded_normal.end());
 
-            auto expanded_doubled = expand_complex_line(doubled + suffix);
+        if (!before.empty()) {
+            string doubled = before + before.back();
+            auto expanded_doubled = expand_complex_line(doubled + after);
             final_results.insert(final_results.end(), expanded_doubled.begin(), expanded_doubled.end());
-        }
-        else {
-            auto expanded_normal = expand_complex_line(prefix + suffix);
-            final_results.insert(final_results.end(), expanded_normal.begin(), expanded_normal.end());
         }
     }
 
@@ -292,13 +289,7 @@ string modificationFor(const string &from, const string &to) {
             ++i;
             ++j;
         }
-
-        if (j < to.size()) {
-            return "i," + to_string(j) + "," + string(1, to[j]);
-        }
-        else {
-            return "i," + to_string(j) + "," + string(1, to.back());
-        }
+        return "i," + to_string(j) + "," + string(1, to[j]);
     }
 
     if (to.size() + 1 == from.size()) {

@@ -1,6 +1,0 @@
-S
-4
-cat
-cot
-dot
-cat
