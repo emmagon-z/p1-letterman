@@ -33,7 +33,7 @@ int main (int argc, char* argv[]) {
 
     vector<WordInfo> dictionary;
     if (dictType == 'C') {
-        dictionary.reserve(static_cast<size_t>(max(0LL, declared_n) * 2.5));
+        dictionary.reserve(static_cast<size_t>(max(0LL, declared_n) * 3));
     }
     else {
         dictionary.reserve(static_cast<size_t>(max(0LL, declared_n)));
