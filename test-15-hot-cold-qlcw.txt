@@ -1,0 +1,8 @@
+S
+5
+//dictionary-with-comments
+hot
+dot
+cot
+colt
+cold

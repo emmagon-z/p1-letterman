@@ -1,8 +1,0 @@
-S
-6
-// dictionary with comments
-hot
-dot
-cot
-colt
-cold
