@@ -1,7 +1,6 @@
 S
-5
+4
 cat
 cot
 dot
-dog
-fog
+cat

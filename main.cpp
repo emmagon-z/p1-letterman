@@ -66,9 +66,18 @@ int main (int argc, char* argv[]) {
             endIndex = i;
         }
     }
-    if (beginIndex == SIZE_MAX || endIndex == SIZE_MAX) {
-        cerr << "Begin or end word not in dictionary\n";
+    if (beginIndex == SIZE_MAX) {
+        cerr << "Beginning word does not exist in the dictionary\n";
         exit(1);
+    }
+    if (endIndex == SIZE_MAX) {
+        cerr << "Ending word does not exist in the dictionary\n";
+        exit(1);
+    }
+
+    unordered_map<size_t, vector<size_t>> buckets;
+    for (size_t i = 0; i < dictionary.size(); ++i) {
+        buckets[dictionary[i].word.size()].push_back(i);
     }
 
     deque<size_t> sc;
@@ -95,40 +104,51 @@ int main (int argc, char* argv[]) {
             break;
         }
 
-        const string &curWord = dictionary[current].word; 
-        for (size_t i = 0; i < dictionary.size(); ++i) {
-            if (dictionary[i].discovered) {
-                continue;
+        const string &curWord = dictionary[current].word;
+        size_t curLen = curWord.size();
+        
+        vector<size_t> candidateLengths = {curLen};
+        if (opts.allowLength) {
+            candidateLengths.push_back(curLen + 1);
+            if (curLen > 0) {
+                candidateLengths.push_back(curLen - 1);
             }
-            const string &candidate = dictionary[i].word;
-            if ((opts.allowChange || opts.allowSwap) && curWord.size() != candidate.size()) {
-                continue;
-            }
-            if (!opts.allowLength && (curWord.size() != candidate.size()) && !(opts.allowChange || opts.allowSwap)) {
-                continue;
-            }
+        }
 
-            bool similar = false;
-            if (opts.allowChange && oneLetterChange(curWord, candidate)) {
-                similar = true;
+        for (size_t len : candidateLengths) {
+            auto it = buckets.find(len);
+            if (it == buckets.end()) {
+                continue;
             }
-            if (!similar && opts.allowLength && insertOrDelete(curWord, candidate)) {
-                similar = true;
-            }
-            if (!similar && opts.allowSwap && swapAdjacent(curWord, candidate)) {
-                similar = true;
-            }
+            
+            for (size_t i : it->second) {
+                if (dictionary[i].discovered) {
+                    continue;
+                }
+                const string &candidate = dictionary[i].word;
+                
+                bool similar = false;
+                if (opts.allowChange && oneLetterChange(curWord, candidate)) {
+                    similar = true;
+                }
+                if (!similar && opts.allowLength && insertOrDelete(curWord, candidate)) {
+                    similar = true;
+                }
+                if (!similar && opts.allowSwap && swapAdjacent(curWord, candidate)) {
+                    similar = true;
+                }
 
-            if (similar) {
-                dictionary[i].discovered = true;
-                dictionary[i].parent = current;
-                sc.push_back(i);
+                if (similar) {
+                    dictionary[i].discovered = true;
+                    dictionary[i].parent = current;
+                    sc.push_back(i);
+                }
             }
         }
     }
 
     if (!dictionary[endIndex].discovered) {
-        cout << "No solution, " << discovered_count << " words discovered\n";
+        cout << "No solution, " << discovered_count << " words discovered.\n";
         return 0;
     }
 

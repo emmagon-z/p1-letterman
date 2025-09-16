@@ -42,14 +42,14 @@ Options parseOptions(int argc, char* argv[]) {
                 break;
             case 's':
                 if (opts.search_mode != SearchMode::UNSET) {
-                    cerr << "Multiple routing modes\n";
+                    cerr << "Conflicting or duplicate stack and queue specified\n";
                     exit(1);
                 }
                 opts.search_mode = SearchMode::STACK;
                 break;
             case 'q':
                 if (opts.search_mode != SearchMode::UNSET) {
-                    cerr << "Multiple routing modes\n";
+                    cerr << "Conflicting or duplicate stack and queue specified\n";
                     exit(1);
                 }
                 opts.search_mode = SearchMode::QUEUE;
@@ -75,36 +75,38 @@ Options parseOptions(int argc, char* argv[]) {
                 } else if (string(optarg) == "M") {
                     opts.output_mode = OutputMode::MOD;
                 } else {
-                    cerr << "Invalid output option\n";
+                    cerr << "Invalid output mode specified\n";
                     exit(1);
                 }
                 break;
             default:
-                cerr << "Unknown option\n";
+                cerr << "Unknown command line option\n";
                 exit(1);
         }
     }
 
     // Validate options
     if (opts.search_mode == SearchMode::UNSET) {
-        cerr << "Must specify exactly one of --stack or --queue\n";
+        cerr << "Must specify one of stack or queue\n";
         exit(1);
     }
-    if (opts.beginWord.empty() || opts.endWord.empty()) {
-        cerr << "Must specify both --begin and --end words\n";
+    if (opts.beginWord.empty()) {
+        cerr << "Beginning word not specified\n";
+        exit(1);
+    }
+    if (opts.endWord.empty()) {
+        cerr << "Ending word not specified\n";
         exit(1);
     }
     if (!opts.allowChange && !opts.allowLength && !opts.allowSwap) {
-        cerr << "Must specify at least one of --change, --length, or --swap\n";
+        cerr << "Must specify at least one modification mode (change length swap)\n";
         exit(1);
     }
-    if (!opts.allowLength && (opts.allowChange || opts.allowSwap)) {
-        if (opts.beginWord.size() != opts.endWord.size()) {
-            cerr << "--begin and --end words must be the same length unless -l is specified\n";
-            exit(1);
-        }
+    if (!opts.allowLength && (opts.beginWord.size() != opts.endWord.size())) {
+        cerr << "The first and last words must have the same length when length mode is off\n";
+        exit(1);
     }
-
+    
     return opts;
 }
 
@@ -237,10 +239,11 @@ bool swapAdjacent(const string &a, const string &b) {
     for (size_t i = 0; i + 1 < a.size(); ++i) {
         string temp = a;
         swap(temp[i], temp[i + 1]);
-        if (temp == b) {
+        if (temp == b && a != b) {
             return true;
         }
     }
+
     return false;
 }
 
