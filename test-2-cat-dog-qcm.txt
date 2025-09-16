@@ -1,0 +1,6 @@
+S
+4
+cat
+dot
+dog
+cot

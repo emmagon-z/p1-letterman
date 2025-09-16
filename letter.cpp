@@ -1,0 +1,295 @@
+// Project Identifier: 50EB44D3F029ED934858FFFCEAC3547C68251FC9
+
+#include "letter.h"
+
+using namespace std;
+
+static void usage_and_exit(int code = 0) {
+    if (code == 0) {
+        cout << "Usage: letter [options] < dictionary\n";
+        cout << " --stack/-s or --queue/-q (exactly one)\n";
+        cout << " --begin/-b <word> and --end/-e <word> (both required)\n";
+        cout << " at least one of --change/-c, --length/-l, or --swap/-p\n";
+        cout << " --output/-o (W|M) optional, default W\n";
+        exit(0);
+    }
+    else {
+        cerr << "Try 'letter --help' for more information.\n";
+        exit(1);
+    }
+}
+
+Options parseOptions(int argc, char* argv[]) {
+    Options opts;
+    const option long_options[] = {
+        {"help", no_argument, nullptr, 'h'},
+        {"stack", no_argument, nullptr, 's'},
+        {"queue", no_argument, nullptr, 'q'},
+        {"begin", required_argument, nullptr, 'b'},
+        {"end", required_argument, nullptr, 'e'},
+        {"change", no_argument, nullptr, 'c'},
+        {"length", no_argument, nullptr, 'l'},
+        {"swap", no_argument, nullptr, 'p'},
+        {"output", required_argument, nullptr, 'o'},
+        {nullptr, 0, nullptr, 0}
+    };
+
+    int opt;
+    while ((opt = getopt_long(argc, argv, "hsqb:e:clpo:", long_options, nullptr)) != -1) {
+        switch (opt) {
+            case 'h':
+                usage_and_exit(0);
+                break;
+            case 's':
+                if (opts.search_mode != SearchMode::UNSET) {
+                    cerr << "Multiple routing modes\n";
+                    exit(1);
+                }
+                opts.search_mode = SearchMode::STACK;
+                break;
+            case 'q':
+                if (opts.search_mode != SearchMode::UNSET) {
+                    cerr << "Multiple routing modes\n";
+                    exit(1);
+                }
+                opts.search_mode = SearchMode::QUEUE;
+                break;
+            case 'b':
+                opts.beginWord = optarg;
+                break;
+            case 'e':
+                opts.endWord = optarg;
+                break;
+            case 'c':
+                opts.allowChange = true;
+                break;
+            case 'l':
+                opts.allowLength = true;
+                break;
+            case 'p':
+                opts.allowSwap = true;
+                break;
+            case 'o':
+                if (string(optarg) == "W") {
+                    opts.output_mode = OutputMode::WORD;
+                } else if (string(optarg) == "M") {
+                    opts.output_mode = OutputMode::MOD;
+                } else {
+                    cerr << "Invalid output option\n";
+                    exit(1);
+                }
+                break;
+            default:
+                cerr << "Unknown option\n";
+                exit(1);
+        }
+    }
+
+    // Validate options
+    if (opts.search_mode == SearchMode::UNSET) {
+        cerr << "Must specify exactly one of --stack or --queue\n";
+        exit(1);
+    }
+    if (opts.beginWord.empty() || opts.endWord.empty()) {
+        cerr << "Must specify both --begin and --end words\n";
+        exit(1);
+    }
+    if (!opts.allowChange && !opts.allowLength && !opts.allowSwap) {
+        cerr << "Must specify at least one of --change, --length, or --swap\n";
+        exit(1);
+    }
+    if (!opts.allowLength && (opts.allowChange || opts.allowSwap)) {
+        if (opts.beginWord.size() != opts.endWord.size()) {
+            cerr << "--begin and --end words must be the same length unless -l is specified\n";
+            exit(1);
+        }
+    }
+
+    return opts;
+}
+
+string trim (const string &s) {
+    size_t a = 0;
+    size_t b = s.size();
+
+    while (a < b && isspace(static_cast<unsigned char>(s[a]))) {
+        ++a;
+    }
+    while (b > a && isspace(static_cast<unsigned char>(s[b - 1]))) {
+        --b;
+    }
+
+    return s.substr(a, b - a);
+}
+
+vector<string> expand_complex_line(const string &line) {
+    if(line.find_first_of("&[]!?") == string::npos) {
+        return {line};
+    }
+    if(!line.empty() && line.back() == '&') {
+        string base = line.substr(0, line.size() - 1);
+        string rev = base;
+        reverse(rev.begin(), rev.end());
+        return {base, rev};
+    }
+
+    size_t left_bracket = line.find('[');
+    if (left_bracket != string::npos) {
+        size_t right_bracket = line.find(']', left_bracket);
+        if (right_bracket == string::npos) {
+            return {line};
+        }
+        string before = line.substr(0, left_bracket);
+        string choices = line.substr(left_bracket + 1, right_bracket - left_bracket - 1);
+        string after = line.substr(right_bracket + 1);
+
+        vector<string> out;
+        for (char c : choices) {
+            out.push_back(before + c + after);
+        }
+        return out;
+    }
+
+    size_t ex = line.find('!');
+    if (ex != string::npos) {
+        string before = line.substr(0, ex);
+        if (before.size() < 2) {
+            return {before};
+        }
+        string swapped = before;
+        
+        swap(swapped[swapped.size() - 2], swapped[swapped.size() - 1]);
+        
+        return {before, swapped};
+    }
+
+    size_t qm = line.find('?');
+    if (qm != string::npos) {
+        string before = line.substr(0, qm);
+        string doubled = before;
+        
+        if (!before.empty()) {
+            doubled.push_back(before.back());
+        }
+
+        string after = line.substr(qm + 1);
+        return {before + after, doubled + after};
+    }
+
+    return {line};
+}
+
+bool oneLetterChange(const string &a, const string &b) {
+    if (a.size() != b.size()) {
+        return false;
+    }
+    int diff = 0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (a[i] != b[i]) {
+            ++diff;
+            if (diff > 1) {
+                return false;
+            }
+        }
+    }
+
+    return diff == 1;
+}
+
+bool insertOrDelete(const string &a, const string &b) {
+    if (a.size() == b.size()) {
+        return false;
+    }
+    if ((a.size() + 1 != b.size()) && (b.size() + 1 != a.size())) {
+        return false;
+    }
+
+    const string &s = (a.size() < b.size()) ? a : b;
+    const string &l = (a.size() < b.size()) ? b : a;
+
+    size_t i = 0, j = 0;
+    bool skipped = false;
+    while (i < s.size() && j < l.size()) {
+        if (s[i] == l[j]) {
+            ++i;
+            ++j;
+        }
+        else if (!skipped) {
+            skipped = true;
+            ++j;
+        }
+        else {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool swapAdjacent(const string &a, const string &b) {
+    if (a.size() != b.size()) {
+        return false;
+    }
+    
+    if (a.size() < 2) {
+        return false;
+    }
+
+    for (size_t i = 0; i + 1 < a.size(); ++i) {
+        string temp = a;
+        swap(temp[i], temp[i + 1]);
+        if (temp == b) {
+            return true;
+        }
+    }
+    return false;
+}
+
+string modificationFor(const string &from, const string &to) {
+    if (from.size() == to.size()) {
+        for (size_t i = 0; i + 1 < from.size(); ++i) {
+            string temp = from;
+            swap(temp[i], temp[i + 1]);
+            if (temp == to) {
+                return "s," + to_string(i);
+            }
+        }
+
+        size_t pos = 0;
+        while (pos < from.size() && from[pos] == to[pos]) {
+            ++pos;
+        }
+        
+        if (pos < from.size()) {
+            return "c," + to_string(pos) + "," + string(1, to[pos]);
+        }
+
+        return "";
+    }
+
+    if (from.size() + 1 == to.size()) {
+        size_t i = 0, j = 0;
+        while (i < from.size() && from[i] == to[j]) {
+            ++i;
+            ++j;
+        }
+
+        if (j < to.size()) {
+            return "i," + to_string(j) + "," + string(1, to[j]);
+        }
+        else {
+            return "i," + to_string(j) + "," + string(1, to.back());
+        }
+    }
+
+    if (to.size() + 1 == from.size()) {
+        size_t i = 0, j = 0;
+        while (j < to.size() && from[i] == to[j]) {
+            ++i;
+            ++j;
+        }
+
+        return "d," + to_string(i);
+    }
+
+    return "";
+}
