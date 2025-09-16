@@ -106,7 +106,7 @@ Options parseOptions(int argc, char* argv[]) {
         cerr << "The first and last words must have the same length when length mode is off\n";
         exit(1);
     }
-    
+
     return opts;
 }
 
@@ -128,57 +128,74 @@ vector<string> expand_complex_line(const string &line) {
     if(line.find_first_of("&[]!?") == string::npos) {
         return {line};
     }
-    if(!line.empty() && line.back() == '&') {
+
+    vector<string> final_results;
+    size_t amp = line.find('&');
+    size_t l_bracket = line.find('[');
+    size_t excl = line.find('!');
+    size_t q_mark = line.find('?');
+
+    if (amp != string::npos && (amp < l_bracket || l_bracket == string::npos) &&
+        (amp < excl || excl == string::npos) && (amp < q_mark || q_mark == string::npos)) {
         string base = line.substr(0, line.size() - 1);
         string rev = base;
         reverse(rev.begin(), rev.end());
-        return {base, rev};
+
+        auto expanded_base = expand_complex_line(base);
+        final_results.insert(final_results.end(), expanded_base.begin(), expanded_base.end());
+
+        auto expanded_rev = expand_complex_line(rev);
+        final_results.insert(final_results.end(), expanded_rev.begin(), expanded_rev.end());
     }
+    else if (l_bracket != string::npos && (l_bracket < excl || excl == string::npos) &&
+             (l_bracket < q_mark || q_mark == string::npos)) {
+        size_t r_bracket = line.find(']', l_bracket);
+        string before = line.substr(0, l_bracket);
+        string choices = line.substr(l_bracket + 1, r_bracket - l_bracket - 1);
+        string after = line.substr(r_bracket + 1);
 
-    size_t left_bracket = line.find('[');
-    if (left_bracket != string::npos) {
-        size_t right_bracket = line.find(']', left_bracket);
-        if (right_bracket == string::npos) {
-            return {line};
-        }
-        string before = line.substr(0, left_bracket);
-        string choices = line.substr(left_bracket + 1, right_bracket - left_bracket - 1);
-        string after = line.substr(right_bracket + 1);
-
-        vector<string> out;
         for (char c : choices) {
-            out.push_back(before + c + after);
+            auto recursive_results = expand_complex_line(before + c + after);
+            final_results.insert(final_results.end(), recursive_results.begin(), recursive_results.end());
         }
-        return out;
+    }
+    else if (excl != string::npos && (excl < q_mark || q_mark == string::npos)) {
+        string prefix = line.substr(0, excl);
+        string suffix = line.substr(excl + 1);
+        if (prefix.length() >= 2) {
+            string swapped = prefix;
+            swap(swapped[swapped.length() - 1], swapped[swapped.length() - 2]);
+            
+            auto expanded_swapped = expand_complex_line(swapped + suffix);
+            final_results.insert(final_results.end(), expanded_swapped.begin(), expanded_swapped.end());
+
+            auto expanded_prefix = expand_complex_line(prefix + suffix);
+            final_results.insert(final_results.end(), expanded_prefix.begin(), expanded_prefix.end());
+        }
+        else {
+            auto expanded_prefix = expand_complex_line(prefix + suffix);
+            final_results.insert(final_results.end(), expanded_prefix.begin(), expanded_prefix.end());
+        }
+    }
+    else if (q_mark != string::npos) {
+        string prefix = line.substr(0, q_mark);
+        string suffix = line.substr(q_mark + 1);
+        if (!prefix.empty()) {
+            string doubled = prefix + prefix.back();
+
+            auto expanded_normal = expand_complex_line(prefix + suffix);
+            final_results.insert(final_results.end(), expanded_normal.begin(), expanded_normal.end());
+
+            auto expanded_doubled = expand_complex_line(doubled + suffix);
+            final_results.insert(final_results.end(), expanded_doubled.begin(), expanded_doubled.end());
+        }
+        else {
+            auto expanded_normal = expand_complex_line(prefix + suffix);
+            final_results.insert(final_results.end(), expanded_normal.begin(), expanded_normal.end());
+        }
     }
 
-    size_t ex = line.find('!');
-    if (ex != string::npos) {
-        string before = line.substr(0, ex);
-        if (before.size() < 2) {
-            return {before};
-        }
-        string swapped = before;
-        
-        swap(swapped[swapped.size() - 2], swapped[swapped.size() - 1]);
-        
-        return {before, swapped};
-    }
-
-    size_t qm = line.find('?');
-    if (qm != string::npos) {
-        string before = line.substr(0, qm);
-        string doubled = before;
-        
-        if (!before.empty()) {
-            doubled.push_back(before.back());
-        }
-
-        string after = line.substr(qm + 1);
-        return {before + after, doubled + after};
-    }
-
-    return {line};
+    return final_results;
 }
 
 bool oneLetterChange(const string &a, const string &b) {

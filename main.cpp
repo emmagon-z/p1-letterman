@@ -46,11 +46,17 @@ int main (int argc, char* argv[]) {
             continue;
         }
         if (dictType == 'S') {
+            if (!opts.allowLength && t.length() != opts.beginWord.length()) {
+                continue;
+            }
             dictionary.push_back({t});
         }
         else {
             auto exp = expand_complex_line(t);
             for (auto &w : exp) {
+                if (!opts.allowLength && w.length() != opts.beginWord.length()) {
+                    continue;
+                }
                 dictionary.push_back({w});
             }
         }
@@ -115,6 +121,8 @@ int main (int argc, char* argv[]) {
             }
         }
 
+        vector<size_t> neighborsToAdd;
+
         for (size_t len : candidateLengths) {
             auto it = buckets.find(len);
             if (it == buckets.end()) {
@@ -141,8 +149,19 @@ int main (int argc, char* argv[]) {
                 if (similar) {
                     dictionary[i].discovered = true;
                     dictionary[i].parent = current;
-                    sc.push_back(i);
+
+                    if (opts.search_mode == SearchMode::QUEUE) {
+                        sc.push_back(i);
+                    }
+                    else {
+                        neighborsToAdd.push_back(i);
+                    }
                 }
+            }
+        }
+        if (opts.search_mode == SearchMode::STACK) {
+            for (auto it = neighborsToAdd.rbegin(); it != neighborsToAdd.rend(); ++it) {
+                sc.push_back(*it);
             }
         }
     }
